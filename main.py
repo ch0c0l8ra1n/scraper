@@ -31,13 +31,14 @@ class Worker():
             if resp["success"]:
                 results += resp["result"]
 
-            elif:
+            else:
                 if resp["error"] == Errors.codeError:
-                    pass
+                    code = self.getCode()
                 
                 elif resp["error"] == Errors.proxyError:
-                    pass
-
+                    proxy = self.getProxy()
+        
+        return result
             
             
     def codesRemaining(self):
@@ -71,16 +72,22 @@ class Checker():
     def loadCodes(self,codes):
         self.codes = codes
 
-    def loadProxies(self,proxies):
+    def loadProxies(self,proxies,rot=False):
         self.proxies = proxies
+        self.rotating=rot
 
     def check(self):
         pool = ThreadPool(threadCount)
         workers = [ Worker(i,module) for i in range(threadCount)]
-        result = pool.map( lambda _: Wroker.getResult() , range(threadCount) )
+        for worker in workers:
+            worker.loadProxies(self.proxies)
+            worker.loadCodes(self.codes)
+            worker.proxiesRotation(self.rotating)
+
+        results = pool.map( lambda worker: worker.getResult() , workers )
         pool.close()
 
-        return result
+        return results
         
 
 
