@@ -1,5 +1,9 @@
 from multiprocessing.pool import ThreadPool
 
+class Errors:
+    codeError = 0
+    proxyError = 1
+
 class Worker():
     def __init__(self,workerId,work,codes,proxies):
         self.workerId = workerId
@@ -18,8 +22,21 @@ class Worker():
         proxy = self.getProxy()
         
         while code != None and proxy != None:
-            resp = self.work(code,proxy)
+            resp = self.work(code,proxy)    
 
+            if "success" not in resp:
+                print("Module not configured properly")
+                return results
+
+            if resp["success"]:
+                results += resp["result"]
+
+            elif:
+                if resp["error"] == Errors.codeError:
+                    pass
+                
+                elif resp["error"] == Errors.proxyError:
+                    pass
 
             
             
