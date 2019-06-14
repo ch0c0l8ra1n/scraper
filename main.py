@@ -1,6 +1,8 @@
 from multiprocessing.pool import ThreadPool
 import testModule
+import threading
 
+lock = threading.Lock()
 
 class Errors:
     codeError = 0
@@ -13,6 +15,10 @@ class Worker():
         self.codes = codes
         self.proxies = proxies
         self.rotating = False
+        self.counters=None
+
+    def setCounters(self,counters):
+        self.counters = counters
 
     def proxiesRotation(self,rot):
         self.rotating = rot
@@ -24,7 +30,7 @@ class Worker():
         proxy = self.getProxy()
         
         while code != None and proxy != None:
-            resp = self.work(code,proxy)    
+            resp = self.work(code,proxy,self.counters)    
 
             if "success" not in resp:
                 print("Module not configured properly")
@@ -47,19 +53,22 @@ class Worker():
         return len(self.codes) > 0
 
     def proxiesRemaining(self):
-        return len(self.codes) > 0
+        return len(self.proxies) > 0
     
     def getCode(self):
         if self.codesRemaining():
-            code = self.codes.pop()
+            with lock:
+                code = self.codes.pop()
             return code
         return None
 
     def getProxy(self):
         if self.proxiesRemaining():
-            proxy = self.proxies.pop()
+            with lock:
+                proxy = self.proxies.pop()
             if self.rotating:
-                self.proxies = [proxy] + self.proxies
+                with lock:
+                    self.proxies = [proxy] + self.proxies
             return proxy
         return None
         
@@ -72,6 +81,8 @@ class Checker():
         self.proxies = []
         self.threadCount=100
         self.rotating = False
+        self.counters = {
+                }
 
     def loadCodes(self,codes):
         self.codes = codes
@@ -89,6 +100,7 @@ class Checker():
         
         for worker in workers:
             worker.proxiesRotation(self.rotating)
+            worker.setCounters(self.counters)
 
         results = pool.map( lambda worker: worker.getResult() , workers )
         pool.close()
@@ -99,6 +111,8 @@ class Checker():
 
 def main():
     checker = Checker(testModule.work)
+    checker.loadCodes( list(range(100000)) )
+    checker.loadProxies( list(range(100000)) )
     res = checker.check()
     print(res)
 
