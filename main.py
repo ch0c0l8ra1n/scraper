@@ -1,4 +1,6 @@
 from multiprocessing.pool import ThreadPool
+import testModule
+
 
 class Errors:
     codeError = 0
@@ -38,14 +40,14 @@ class Worker():
                 elif resp["error"] == Errors.proxyError:
                     proxy = self.getProxy()
         
-        return result
+        return results
             
             
     def codesRemaining(self):
-        return len(codes) > 0
+        return len(self.codes) > 0
 
     def proxiesRemaining(self):
-        return len(codes) > 0
+        return len(self.codes) > 0
     
     def getCode(self):
         if self.codesRemaining():
@@ -66,8 +68,10 @@ class Worker():
 class Checker():
     def __init__(self,module,threadCount=100):
         self.module = module
-        self.codes = None
-        self.proxies = None
+        self.codes = []
+        self.proxies = []
+        self.threadCount=100
+        self.rotating = False
 
     def loadCodes(self,codes):
         self.codes = codes
@@ -77,11 +81,13 @@ class Checker():
         self.rotating=rot
 
     def check(self):
-        pool = ThreadPool(threadCount)
-        workers = [ Worker(i,module) for i in range(threadCount)]
+        pool = ThreadPool(self.threadCount)
+        
+        workers = [ 
+                Worker(i,self.module,self.codes,self.proxies) 
+                for i in range(self.threadCount)]
+        
         for worker in workers:
-            worker.loadProxies(self.proxies)
-            worker.loadCodes(self.codes)
             worker.proxiesRotation(self.rotating)
 
         results = pool.map( lambda worker: worker.getResult() , workers )
@@ -92,7 +98,9 @@ class Checker():
 
 
 def main():
-    pass
+    checker = Checker(testModule.work)
+    res = checker.check()
+    print(res)
 
 if __name__ == "__main__":
     main()
