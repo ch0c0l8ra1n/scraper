@@ -24,6 +24,7 @@ class Worker():
         codes and proxies are shared betwen workers so remember
         to acquire lock before using it
         '''
+        self.proxyLess = False
         self.workerId = workerId
         self.work = work
         self.codes = codes
@@ -31,9 +32,15 @@ class Worker():
         self.rotating = False
         self.counters=None
 
+    def setProxyLess(self,proxyLess):
+        '''
+        Sets the proxyLess flag
+        '''
+        self.proxyLess = proxyLess
+
     def setCounters(self,counters):
         '''
-        counters is the object that is shared betwen the Checker, Worker
+        counters is the object that is shared betwen the Scraper, Worker
         and the worker function
         Remember to acquire the lock before updating counters 
         '''
@@ -55,11 +62,15 @@ class Worker():
         results = []
 
         code = self.getCode()
-        proxy = self.getProxy()
+        if not self.proxyLess:
+            proxy = self.getProxy()
         
-        while code != None and proxy != None:
+        while code != None and (self.proxyLess or proxy != None):
             #While codes or proxies aren't depleted
-            resp = self.work(code,proxy,self.counters)    
+            if self.proxyLess:
+                resp = self.work(code,self.counters)    
+            else:
+                resp = self.work(code,proxy,self.counters)
 
             if "success" not in resp:
                 print("Module not configured properly")
@@ -67,7 +78,7 @@ class Worker():
 
             if resp["success"]:
                 results += resp["result"]
-
+                code = self.getCode()
             else:
                 if resp["error"] == Errors.codeError:
                     code = self.getCode()
@@ -115,9 +126,9 @@ class Worker():
         
         
 
-class Checker():
+class Scraper():
     '''
-    Checker object.
+    Scraper object.
     runs the work function till the codes or the proxy run out,
     on various threads (default = 100 )
     '''
@@ -125,6 +136,7 @@ class Checker():
         '''
         Initialization
         '''
+        self.proxyLess = False
         self.work = work
         self.codes = []
         self.proxies = []
@@ -132,6 +144,12 @@ class Checker():
         self.rotating = False
         self.counters = {
                 }
+
+    def setProxyLess(self,proxyLess):
+        '''
+        Sets the proxyLess flag
+        '''
+        self.proxyLess = proxyLess
 
     def loadCodes(self,codes):
         '''
@@ -146,7 +164,7 @@ class Checker():
         self.proxies = proxies
         self.rotating=rot
 
-    def check(self):
+    def scrape(self):
         '''
         "Checks" the codes against the supplied proxies
         By instantiating worker classes
@@ -160,7 +178,7 @@ class Checker():
         for worker in workers:
             worker.proxiesRotation(self.rotating)
             worker.setCounters(self.counters)
-
+            worker.setProxyLess(self.proxyLess)
         results = pool.map( lambda worker: worker.getResult() , workers )
         pool.close()
 
@@ -169,10 +187,10 @@ class Checker():
 
 
 def main():
-    checker = Checker(testModule.work)
-    checker.loadCodes( list(range(100000)) )
-    checker.loadProxies( list(range(100000)) )
-    res = checker.check()
+    scraper = Scraper(testModule.work,200)
+    scraper.loadCodes( list(range(100000)) )
+    scraper.loadProxies( list(range(100000)) )
+    res = scraper.scrape()
     print(res)
 
 if __name__ == "__main__":

@@ -22,3 +22,6 @@ proxyE = {
 def work(code,proxy,counters):
     res = random.choice([ succ] * 1 + [codeE] + [proxyE])
     return res
+
+def workProxyLess(code,counters):
+    return work(code,None,counters)
