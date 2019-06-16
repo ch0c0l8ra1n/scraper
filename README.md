@@ -3,7 +3,7 @@ A generic multithreaded scraper
 
 Usage:
 
-```
+```python3
 # Note this is a psuedocode (parts of it) and not an actual code that you can copy and paste
 from scraper import Scraper
 import requests
