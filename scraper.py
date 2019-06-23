@@ -1,9 +1,14 @@
 from multiprocessing.pool import ThreadPool
 import testModule
 import threading
+import random
+import time
 
 #Lock object, Used to update the codes, proxies and the counters
 lock = threading.Lock()
+
+#Clearing existing working.txt file
+open("working.txt","w+").close()
 
 class Errors:
     '''
@@ -12,6 +17,12 @@ class Errors:
     '''
     codeError = 0
     proxyError = 1
+
+def safeWrite(fName,obj):
+    with lock:
+        f = open(fName,"a+")
+        f.write(str(obj))
+        f.close()
 
 class Worker():
     '''
@@ -31,6 +42,8 @@ class Worker():
         self.proxies = proxies
         self.rotating = False
         self.counters=None
+        self.proxiesTotal=len(proxies)
+        self.codesTotal=len(codes)
 
     def setProxyLess(self,proxyLess):
         '''
@@ -67,6 +80,16 @@ class Worker():
         
         while code != None and (self.proxyLess or proxy != None):
             #While codes or proxies aren't depleted
+            
+            checked = self.counters["CODESTOTAL"]-len(self.codes)
+            elapsed = time.time() - self.counters["STARTTIME"]
+            CPM = checked * 60 // elapsed
+            print("Hits: {} Codes : {}/{} Proxies : {}/{} CPM: {}".format(
+                self.counters["HITS"],
+                len(self.codes),   self.counters["CODESTOTAL"],
+                len(self.proxies), self.counters["PROXIESTOTAL"],
+                CPM
+                ))
             if self.proxyLess:
                 resp = self.work(code,self.counters)    
             else:
@@ -79,6 +102,8 @@ class Worker():
             if resp["success"]:
                 results += resp["result"]
                 code = self.getCode()
+                safeWrite("working.txt",code)
+                self.counters["HITS"] += 1
             else:
                 if resp["error"] == Errors.codeError:
                     code = self.getCode()
@@ -140,9 +165,13 @@ class Scraper():
         self.work = work
         self.codes = []
         self.proxies = []
-        self.threadCount=100
+        self.threadCount=threadCount
         self.rotating = False
         self.counters = {
+                "HITS" : 0,
+                "CODESTOTAL":len(self.codes),
+                "PROXIESTOTAL":len(self.proxies),
+                "STARTTIME":time.time()
                 }
 
     def setProxyLess(self,proxyLess):
@@ -156,12 +185,14 @@ class Scraper():
         Loads the codes
         '''
         self.codes = codes
+        random.shuffle(self.codes)
 
     def loadProxies(self,proxies,rot=False):
         '''
         Loads the proxies
         '''
         self.proxies = proxies
+        random.shuffle(self.proxies)
         self.rotating=rot
 
     def scrape(self):
@@ -170,6 +201,13 @@ class Scraper():
         By instantiating worker classes
         '''
         pool = ThreadPool(self.threadCount)
+        
+        self.counters = {
+                "HITS" : 0,
+                "CODESTOTAL":len(self.codes),
+                "PROXIESTOTAL":len(self.proxies),
+                "STARTTIME":time.time()
+                }
         
         workers = [ 
                 Worker(i,self.work,self.codes,self.proxies) 
